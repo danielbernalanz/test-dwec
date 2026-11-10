@@ -1,0 +1,16 @@
+{
+  "name": "test-dwec",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Test de práctica de Desarrollo Web Entorno Cliente con ranking",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

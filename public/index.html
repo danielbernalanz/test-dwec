@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Test DWEC</title>
+<meta name="description" content="Test de práctica de Desarrollo Web Entorno Cliente (UD1-UD3) con ranking.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23f7df1e'/%3E%3Ctext x='16' y='23' font-family='monospace' font-weight='700' font-size='16' text-anchor='middle' fill='%23141414'%3EJS%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  /* Layout: una columna centrada tipo "consola del navegador"; barra superior fija con pestañas Jugar / Ranking / Ejercicios. */
+  :root {
+    --bg: #f3f4f1; --panel: #ffffff; --ink: #17191c; --muted: #5d6168; --line: #dcdfd8;
+    --accent: #f7df1e; --accent-ink: #17191c; --code-bg: #1d1f23; --code-ink: #e9e6d6;
+    --ok: #1f7a47; --ok-bg: #e3f3e9; --bad: #b3261e; --bad-bg: #fbe7e5; --focus: #2a5bd7;
+    --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #131416; --panel: #1c1e21; --ink: #ecebe4; --muted: #a2a49e; --line: #2f3236;
+      --code-bg: #0d0e10; --code-ink: #e9e6d6; --ok: #6fd39a; --ok-bg: #16301f; --bad: #ff8a80; --bad-bg: #3a1a18; --focus: #8fb0ff; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 17px/1.55 var(--f-body); min-height: 100vh;
+    padding-bottom: env(safe-area-inset-bottom, 0px); }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
+  .bar { max-width: 860px; margin: 0 auto; display: flex; align-items: center; gap: 12px; min-height: 56px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 800 20px/1 var(--f-display); letter-spacing: -.01em; margin-right: auto; }
+  .brand i { font: 700 13px/1 var(--f-mono); font-style: normal; background: var(--accent); color: var(--accent-ink); padding: 6px 6px 5px; border-radius: 5px; }
+  nav { display: flex; gap: 4px; }
+  nav button { border: 0; background: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 700; }
+  nav button[aria-current="page"] { color: var(--ink); background: var(--bg); box-shadow: inset 0 -3px 0 var(--accent); }
+
+  main { max-width: 860px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 64px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 20px; }
+  h1, h2, h3 { font-family: var(--f-display); letter-spacing: -.015em; line-height: 1.15; margin: 0; text-wrap: balance; }
+  h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 800; }
+  h2 { font-size: 22px; font-weight: 800; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .label { font: 600 12px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: grid; gap: 14px; min-width: 0; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .btn { border: 1px solid var(--line); background: var(--panel); padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .btn.primary:hover { filter: brightness(.95); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  input[type=text] { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; width: 100%; max-width: 320px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips label { position: relative; }
+  .chips input { position: absolute; opacity: 0; inset: 0; }
+  .chips span { display: block; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; background: var(--panel); }
+  .chips small { color: var(--muted); font-family: var(--f-mono); font-size: 12px; margin-left: 4px; }
+  .chips input:checked + span { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  .chips input:checked + span small { color: inherit; opacity: .75; }
+  .chips input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .err { color: var(--bad); font-weight: 700; }
+  .note { font-size: 15px; color: var(--muted); }
+
+  /* Pregunta */
+  .hud { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; font-family: var(--f-mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .hud b { font-size: 18px; }
+  .progress { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+  .qtext { font-size: 20px; font-weight: 700; white-space: pre-wrap; overflow-wrap: anywhere; }
+  pre.code, .qcode { background: var(--code-bg); color: var(--code-ink); font: 14.5px/1.55 var(--f-mono); padding: 14px 16px; border-radius: 10px; overflow-x: auto; margin: 0; white-space: pre; }
+  .opts { display: grid; gap: 10px; }
+  .opt { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; text-align: left; width: 100%;
+    border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+  .opt:hover:not(:disabled) { border-color: var(--ink); }
+  .opt .k { font: 700 13px/26px var(--f-mono); text-align: center; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+  .opt .t { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+  .opt.mono .t { font-family: var(--f-mono); font-size: 15px; }
+  .opt:disabled { cursor: default; }
+  .opt.right { border-color: var(--ok); background: var(--ok-bg); }
+  .opt.right .k { background: var(--ok); color: var(--panel); border-color: var(--ok); }
+  .opt.wrong { border-color: var(--bad); background: var(--bad-bg); }
+  .opt.wrong .k { background: var(--bad); color: var(--panel); border-color: var(--bad); }
+  .feedback { border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; }
+  .feedback.ok { background: var(--ok-bg); }
+  .feedback.bad { background: var(--bad-bg); }
+  .feedback strong { font-family: var(--f-display); font-size: 18px; }
+  .feedback.ok strong { color: var(--ok); }
+  .feedback.bad strong { color: var(--bad); }
+  kbd { font: 12px var(--f-mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+
+  /* Resultado */
+  .score { display: flex; gap: 28px; flex-wrap: wrap; }
+  .score div { display: grid; gap: 2px; }
+  .score b { font: 800 40px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+  .fail { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 6px; }
+  .fail .ans { color: var(--ok); font-weight: 700; white-space: pre-wrap; }
+  .fail .yours { color: var(--bad); white-space: pre-wrap; }
+
+  /* Ranking */
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font: 600 12px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  td.pos { font-family: var(--f-mono); color: var(--muted); width: 3em; }
+  td.name { white-space: normal; overflow-wrap: anywhere; font-weight: 700; }
+  tr.me td { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  select { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 10px; }
+
+  /* Ejercicios */
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  details > summary { cursor: pointer; padding: 14px 18px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::before { content: "▸"; color: var(--muted); }
+  details[open] > summary::before { content: "▾"; }
+  details > summary b { font-family: var(--f-display); font-size: 18px; }
+  .tag { font: 600 11px/1 var(--f-mono); text-transform: uppercase; letter-spacing: .06em; padding: 4px 7px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); }
+  .tag.amp { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .ex { padding: 0 18px 18px; display: grid; gap: 14px; min-width: 0; }
+  .ex ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+  .tip { border-left: 4px solid var(--accent); padding: 4px 0 4px 12px; }
+  .exlist { display: grid; gap: 10px; }
+
+  @media (max-width: 520px) {
+    body { font-size: 16px; }
+    .qtext { font-size: 18px; }
+    .score b { font-size: 32px; }
+    nav button { padding: 8px 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand"><i>JS</i> Test DWEC</div>
+    <nav aria-label="Secciones">
+      <button type="button" data-tab="jugar" aria-current="page">Jugar</button>
+      <button type="button" data-tab="ranking">Ranking</button>
+      <button type="button" data-tab="ejercicios">Práctica</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ===== Inicio ===== -->
+  <section id="v-inicio" class="view" data-view="jugar">
+    <div class="card">
+      <div style="display:grid;gap:6px">
+        <span class="label">Desarrollo Web Entorno Cliente · UD1–UD3</span>
+        <h1>Practica el examen tipo test</h1>
+        <p class="muted">Responde, mira la explicación al momento y compite en el ranking por nota y por tiempo. Solo cuenta el tiempo que pasas pensando cada pregunta.</p>
+      </div>
+
+      <div id="resume" class="card" style="background:var(--bg)" hidden>
+        <p><b>Tienes una partida a medias:</b> <span id="resume-info"></span></p>
+        <div class="row">
+          <button type="button" class="btn primary" id="btn-resume">Continuar</button>
+          <button type="button" class="btn" id="btn-discard">Descartar</button>
+        </div>
+      </div>
+
+      <form id="setup" style="display:grid;gap:18px">
+        <div style="display:grid;gap:6px">
+          <label class="label" for="name">Tu nombre en el ranking</label>
+          <input type="text" id="name" maxlength="20" autocomplete="nickname" placeholder="Ej. Dani" required>
+          <span class="note">Entre 2 y 20 caracteres. El nombre queda ligado a este dispositivo.</span>
+        </div>
+        <fieldset style="border:0;padding:0;margin:0;display:grid;gap:8px">
+          <legend class="label" style="margin-bottom:8px">Tema</legend>
+          <div class="chips" id="temas"></div>
+        </fieldset>
+        <fieldset style="border:0;padding:0;margin:0;display:grid;gap:8px">
+          <legend class="label" style="margin-bottom:8px">Preguntas</legend>
+          <div class="chips" id="longs"></div>
+        </fieldset>
+        <p id="setup-err" class="err" role="alert" hidden></p>
+        <div class="row">
+          <button type="submit" class="btn primary" id="btn-start">Empezar test</button>
+          <span class="note">Atajos: <kbd>1</kbd>–<kbd>6</kbd> o <kbd>A</kbd>–<kbd>F</kbd> para responder, <kbd>Intro</kbd> para seguir.</span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== Pregunta ===== -->
+  <section id="v-quiz" class="view" data-view="jugar" hidden>
+    <div class="card">
+      <div class="hud">
+        <span class="label" id="q-mode"></span>
+        <span>Pregunta <b id="q-n">1</b>/<span id="q-total">20</span></span>
+        <span>Aciertos <b id="q-ok">0</b></span>
+        <span>Tiempo <b id="q-time">0:00</b></span>
+        <button type="button" class="btn" id="btn-quit" style="margin-left:auto;padding:6px 12px">Salir</button>
+      </div>
+      <div class="progress"><i id="q-bar"></i></div>
+      <div id="q-text" class="qtext"></div>
+      <pre id="q-code" class="qcode" hidden></pre>
+      <div class="opts" id="q-opts"></div>
+      <div id="q-feedback" class="feedback" aria-live="polite" hidden></div>
+      <div class="row" id="q-next-row" hidden>
+        <button type="button" class="btn primary" id="btn-next">Siguiente</button>
+      </div>
+      <div id="quit-confirm" class="card" style="background:var(--bg)" hidden>
+        <p>¿Salir? La partida se queda guardada y puedes continuarla desde el inicio.</p>
+        <div class="row">
+          <button type="button" class="btn" id="btn-quit-yes">Salir y guardar</button>
+          <button type="button" class="btn" id="btn-quit-no">Seguir jugando</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Resultado ===== -->
+  <section id="v-result" class="view" data-view="jugar" hidden>
+    <div class="card">
+      <span class="label" id="r-mode"></span>
+      <h1 id="r-title">Resultado</h1>
+      <div class="score">
+        <div><span class="label">Aciertos</span><b id="r-ok"></b></div>
+        <div><span class="label">Nota</span><b id="r-nota"></b></div>
+        <div><span class="label">Tiempo</span><b id="r-time"></b></div>
+      </div>
+      <p id="r-save" class="note" aria-live="polite"></p>
+      <form id="rename" class="row" hidden>
+        <input type="text" id="rename-input" maxlength="20" placeholder="Otro nombre" aria-label="Otro nombre">
+        <button type="submit" class="btn">Guardar con este nombre</button>
+      </form>
+      <div class="row">
+        <button type="button" class="btn primary" id="btn-again">Otra partida</button>
+        <button type="button" class="btn" id="btn-review">Repasar mis fallos</button>
+        <button type="button" class="btn" id="btn-see-rank">Ver ranking</button>
+      </div>
+    </div>
+    <div class="card" id="r-fails-card">
+      <h2>Tus fallos</h2>
+      <div id="r-fails"></div>
+    </div>
+  </section>
+
+  <!-- ===== Ranking ===== -->
+  <section id="v-ranking" class="view" data-view="ranking" hidden>
+    <div class="card">
+      <h1>Ranking</h1>
+      <div class="row">
+        <select id="rk-tema" aria-label="Tema"></select>
+        <select id="rk-long" aria-label="Número de preguntas"><option value="20">20 preguntas</option><option value="all">Todas</option></select>
+        <div class="chips" role="radiogroup" aria-label="Ordenar por">
+          <label><input type="radio" name="rk-by" value="nota" checked><span>Mejor nota</span></label>
+          <label><input type="radio" name="rk-by" value="rapido"><span>Más rápido</span></label>
+        </div>
+      </div>
+      <p class="note" id="rk-help"></p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th>Nombre</th><th>Aciertos</th><th>Nota</th><th>Tiempo</th></tr></thead>
+          <tbody id="rk-body"></tbody>
+        </table>
+      </div>
+      <p class="note" id="rk-status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ===== Ejercicios ===== -->
+  <section id="v-ejercicios" class="view" data-view="ejercicios" hidden>
+    <div class="card">
+      <span class="label">Parte práctica del examen</span>
+      <h1>Cómo se hacen los ejercicios</h1>
+      <p class="muted">Esto es para la parte práctica, no entra en el test de teoría. Primero van los de <b>ampliación</b>, que son los más importantes. Intenta programarlo tú en VS Code antes de abrir la solución y compara con los pasos.</p>
+      <div class="row">
+        <div class="chips" role="radiogroup" aria-label="Filtrar">
+          <label><input type="radio" name="ex-f" value="all" checked><span>Todos</span></label>
+          <label><input type="radio" name="ex-f" value="amp"><span>Ampliación</span></label>
+          <label><input type="radio" name="ex-f" value="2"><span>UD2</span></label>
+          <label><input type="radio" name="ex-f" value="3"><span>UD3</span></label>
+        </div>
+      </div>
+    </div>
+    <div class="exlist" id="ex-list"></div>
+    <p class="note">El ejercicio OperacionesBits (UD2) no está porque trata de binario, que no entra en el examen. La Ampliación 2 de UD3 depende de un archivo .7z que no está en la carpeta.</p>
+  </section>
+</main>
+
+<script src="preguntas.js"></script>
+<script src="ejercicios.js"></script>
+<script>
+'use strict';
+/* ---------- Datos ---------- */
+const TEMAS = [
+  { v: '1', label: 'UD1 · Arquitecturas' },
+  { v: '2', label: 'UD2 · Introducción JS' },
+  { v: '3', label: 'UD3 · Objetos predefinidos' },
+  { v: '4', label: 'Estilo examen' },
+  { v: 'all', label: 'Todo mezclado' },
+];
+const temaLabel = (t) => (TEMAS.find((x) => x.v === t) || { label: 'Repaso de fallos' }).label;
+const KEYS = 'ABCDEF';
+
+// Id estable por enunciado: si se añaden o quitan preguntas, las partidas guardadas siguen sirviendo.
+function hashId(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+const BANK = new Map();
+for (const [u, text, options, expl] of window.PREGUNTAS) { const id = hashId(text); if (!BANK.has(id)) BANK.set(id, { id, u: String(u), text, options, expl }); }
+const ALL = [...BANK.values()];
+const poolOf = (t) => (t === 'all' ? ALL : ALL.filter((q) => q.u === t));
+
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const $ = (id) => document.getElementById(id);
+function fmt(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+const nota = (ok, total) => (total ? (ok / total * 10) : 0).toLocaleString('es', { maximumFractionDigits: 1 });
+
+/* ---------- Almacenamiento local (puede fallar: modo privado, etc.) ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento: la partida no sobrevive a una recarga */ } },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+function deviceToken() {
+  let t = store.get('dwec-token', null);
+  if (!t || !/^[a-f0-9]{32,64}$/.test(t)) {
+    const b = new Uint8Array(16); crypto.getRandomValues(b);
+    t = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+    store.set('dwec-token', t);
+  }
+  return t;
+}
+const TOKEN = deviceToken();
+const runId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+
+/* ---------- API ---------- */
+async function api(path, body) {
+  const res = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  let data = {}; try { data = await res.json(); } catch {}
+  return { status: res.status, data };
+}
+
+/* ---------- Navegación ---------- */
+let tab = 'jugar';
+function showTab(t) {
+  tab = t;
+  document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false'));
+  document.querySelectorAll('.view').forEach((v) => { v.hidden = v.dataset.view !== t || (t === 'jugar' && v.id !== 'v-' + jugarView); });
+  if (t === 'ranking') loadRanking();
+  window.scrollTo(0, 0);
+}
+let jugarView = 'inicio';
+function showJugar(v) { jugarView = v; showTab('jugar'); }
+document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+/* ---------- Inicio ---------- */
+function radioChips(el, name, items, checked) {
+  el.innerHTML = '';
+  for (const it of items) {
+    const l = document.createElement('label');
+    const i = document.createElement('input'); i.type = 'radio'; i.name = name; i.value = it.v; i.checked = it.v === checked;
+    const s = document.createElement('span'); s.textContent = it.label;
+    if (it.count != null) { const sm = document.createElement('small'); sm.textContent = it.count; s.append(sm); }
+    l.append(i, s); el.append(l);
+  }
+}
+const prefs = store.get('dwec-prefs', { tema: '1', long: '20' });
+$('name').value = store.get('dwec-name', '');
+radioChips($('temas'), 'tema', TEMAS.map((t) => ({ ...t, count: poolOf(t.v).length })), prefs.tema);
+function renderLongs() {
+  const t = document.querySelector('input[name=tema]:checked').value;
+  const cur = (document.querySelector('input[name=long]:checked') || {}).value || prefs.long;
+  radioChips($('longs'), 'long', [{ v: '20', label: '20 preguntas' }, { v: 'all', label: 'Todas', count: poolOf(t).length }], cur);
+}
+renderLongs();
+$('temas').addEventListener('change', renderLongs);
+
+function cleanName(n) { return n.normalize('NFC').replace(/\s+/g, ' ').trim(); }
+function nameError(n) {
+  if (n.length < 2 || n.length > 20) return 'El nombre debe tener entre 2 y 20 caracteres.';
+  if (!/^[\p{L}\p{N} _.\-]+$/u.test(n)) return 'Usa solo letras, números, espacios, puntos y guiones.';
+  return null;
+}
+
+$('setup').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = $('setup-err'); err.hidden = true;
+  const name = cleanName($('name').value);
+  const ne = nameError(name);
+  if (ne) { err.textContent = ne; err.hidden = false; $('name').focus(); return; }
+  const tema = document.querySelector('input[name=tema]:checked').value;
+  const long = document.querySelector('input[name=long]:checked').value;
+  store.set('dwec-name', name); store.set('dwec-prefs', { tema, long });
+  $('btn-start').disabled = true;
+  try {
+    const r = await api('/api/claim', { name, token: TOKEN });
+    if (r.status === 409 || r.status === 400) { err.textContent = r.data.error || 'Nombre no válido'; err.hidden = false; return; }
+  } catch { /* sin conexión: se juega igual y la puntuación se envía cuando vuelva la red */ }
+  finally { $('btn-start').disabled = false; }
+  const ids = shuffle(poolOf(tema)).slice(0, long === '20' ? 20 : undefined).map((q) => q.id);
+  startGame({ mode: tema + '-' + long, tema, ranked: true, name, ids });
+});
+
+/* ---------- Partida ---------- */
+let G = null;          // partida en curso (se guarda en localStorage tras cada respuesta)
+let qStart = 0;        // momento en que se mostró la pregunta actual
+let current = null;    // { q, order } pregunta mostrada
+let tick = null;
+
+function startGame({ mode, tema, ranked, name, ids }) {
+  G = { v: 1, mode, tema, ranked, name, ids, i: 0, ok: 0, ms: 0, fails: [], runId: runId() };
+  saveGame(); showJugar('quiz'); showQuestion();
+}
+const saveGame = () => store.set('dwec-partida', G);
+
+function resumable() {
+  const g = store.get('dwec-partida', null);
+  if (!g || g.v !== 1 || !Array.isArray(g.ids) || g.i >= g.ids.length) return null;
+  // Tras una actualización pueden haber cambiado preguntas: se sustituyen las que ya no existen.
+  const used = new Set(g.ids.filter((id) => BANK.has(id)));
+  const spare = shuffle(poolOf(g.tema || 'all')).filter((q) => !used.has(q.id));
+  g.ids = g.ids.map((id) => (BANK.has(id) ? id : (spare.pop() || {}).id)).filter(Boolean);
+  g.fails = (g.fails || []).filter((f) => BANK.has(f.id));
+  return g.i < g.ids.length ? g : null;
+}
+function renderResume() {
+  const g = resumable();
+  $('resume').hidden = !g;
+  if (g) $('resume-info').textContent = `${temaLabel(g.tema)} · pregunta ${g.i + 1}/${g.ids.length} · ${g.ok} aciertos · ${fmt(g.ms)}`;
+}
+$('btn-resume').addEventListener('click', () => { G = resumable(); if (!G) return renderResume(); showJugar('quiz'); showQuestion(); });
+$('btn-discard').addEventListener('click', () => { store.del('dwec-partida'); renderResume(); });
+
+function showQuestion() {
+  const q = BANK.get(G.ids[G.i]);
+  const order = shuffle(q.options.map((_, i) => i));
+  current = { q, order, answered: false };
+  $('q-mode').textContent = temaLabel(G.tema) + (G.ranked ? '' : ' · sin ranking');
+  $('q-n').textContent = G.i + 1; $('q-total').textContent = G.ids.length; $('q-ok').textContent = G.ok;
+  $('q-bar').style.width = (G.i / G.ids.length * 100) + '%';
+  // Enunciado: la primera línea es la pregunta; el resto, si lo hay, es código
+  const nl = q.text.indexOf('\n');
+  $('q-text').textContent = nl < 0 ? q.text : q.text.slice(0, nl);
+  $('q-code').hidden = nl < 0; $('q-code').textContent = nl < 0 ? '' : q.text.slice(nl + 1);
+  const box = $('q-opts'); box.innerHTML = '';
+  const mono = q.options.some((o) => /[;()[\]{}=<>]|^-?\d/.test(o));
+  order.forEach((oi, pos) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'opt' + (mono ? ' mono' : '');
+    const k = document.createElement('span'); k.className = 'k'; k.textContent = KEYS[pos];
+    const t = document.createElement('span'); t.className = 't'; t.textContent = q.options[oi];
+    b.append(k, t); b.addEventListener('click', () => answer(pos)); box.append(b);
+  });
+  $('q-feedback').hidden = true; $('q-next-row').hidden = true; $('quit-confirm').hidden = true;
+  qStart = performance.now();
+  clearInterval(tick); tick = setInterval(updateClock, 250); updateClock();
+  box.firstChild.focus({ preventScroll: true });
+}
+const liveMs = () => G.ms + (current && !current.answered ? Math.min(performance.now() - qStart, 600000) : 0);
+function updateClock() { if (G) $('q-time').textContent = fmt(liveMs()); }
+
+function answer(pos) {
+  if (!current || current.answered) return;
+  current.answered = true;
+  G.ms += Math.min(performance.now() - qStart, 600000); // tope de 10 min por pregunta si dejas la pestaña abierta
+  G.ms = Math.round(G.ms);
+  const { q, order } = current;
+  const chosen = order[pos];
+  const ok = chosen === 0; // en el banco, la opción 0 es siempre la correcta
+  const btns = [...$('q-opts').children];
+  btns.forEach((b, i) => { b.disabled = true; if (order[i] === 0) b.classList.add('right'); });
+  if (!ok) btns[pos].classList.add('wrong');
+  if (ok) G.ok++; else G.fails.push({ id: q.id, chosen });
+  G.i++; saveGame();
+  const fb = $('q-feedback'); fb.className = 'feedback ' + (ok ? 'ok' : 'bad'); fb.innerHTML = '';
+  const s = document.createElement('strong'); s.textContent = ok ? 'Correcto' : 'Incorrecto · la buena es la ' + KEYS[order.indexOf(0)];
+  const p = document.createElement('p'); p.textContent = q.expl;
+  fb.append(s, p); fb.hidden = false;
+  $('q-ok').textContent = G.ok; updateClock(); clearInterval(tick);
+  $('btn-next').textContent = G.i >= G.ids.length ? 'Ver resultado' : 'Siguiente';
+  $('q-next-row').hidden = false; $('btn-next').focus({ preventScroll: true });
+}
+function next() { if (!current || !current.answered) return; if (G.i >= G.ids.length) finish(); else showQuestion(); }
+$('btn-next').addEventListener('click', next);
+
+document.addEventListener('keydown', (e) => {
+  if ($('v-quiz').hidden || e.ctrlKey || e.metaKey || e.altKey || !$('quit-confirm').hidden) return;
+  if (e.target.tagName === 'INPUT') return;
+  const k = e.key.toUpperCase();
+  let pos = '123456'.indexOf(k); if (pos < 0 && k.length === 1) pos = KEYS.indexOf(k);
+  if (pos >= 0 && current && !current.answered && pos < current.order.length) { e.preventDefault(); answer(pos); }
+  else if (e.key === 'Enter' && current && current.answered && document.activeElement !== $('btn-next')) { e.preventDefault(); next(); }
+});
+
+$('btn-quit').addEventListener('click', () => { $('quit-confirm').hidden = false; $('btn-quit-no').focus(); });
+$('btn-quit-no').addEventListener('click', () => { $('quit-confirm').hidden = true; });
+$('btn-quit-yes').addEventListener('click', () => {
+  if (current && !current.answered) { G.ms = Math.round(G.ms + Math.min(performance.now() - qStart, 600000)); saveGame(); }
+  clearInterval(tick); current = null; G = null; renderResume(); showJugar('inicio');
+});
+
+/* ---------- Resultado y envío de la puntuación ---------- */
+let lastGame = null;
+function finish() {
+  clearInterval(tick);
+  lastGame = G; G = null; current = null; store.del('dwec-partida');
+  const g = lastGame;
+  $('r-mode').textContent = temaLabel(g.tema) + (g.ranked ? '' : ' · sin ranking');
+  const pct = g.ok / g.ids.length;
+  $('r-title').textContent = pct === 1 ? '¡Perfecto!' : pct >= .8 ? '¡Muy bien!' : pct >= .5 ? 'Aprobado' : 'A repasar';
+  $('r-ok').textContent = g.ok + '/' + g.ids.length; $('r-nota').textContent = nota(g.ok, g.ids.length); $('r-time').textContent = fmt(g.ms);
+  const fl = $('r-fails'); fl.innerHTML = '';
+  $('r-fails-card').hidden = !g.fails.length; $('btn-review').hidden = !g.fails.length;
+  for (const f of g.fails) {
+    const q = BANK.get(f.id); if (!q) continue;
+    const d = document.createElement('div'); d.className = 'fail';
+    const nl = q.text.indexOf('\n');
+    const t = document.createElement('p'); t.style.fontWeight = '700'; t.textContent = nl < 0 ? q.text : q.text.slice(0, nl);
+    d.append(t);
+    if (nl >= 0) { const c = document.createElement('pre'); c.className = 'code'; c.textContent = q.text.slice(nl + 1); d.append(c); }
+    const y = document.createElement('p'); y.className = 'yours'; y.textContent = '✗ Tu respuesta: ' + q.options[f.chosen];
+    const a = document.createElement('p'); a.className = 'ans'; a.textContent = '✓ Correcta: ' + q.options[0];
+    const x = document.createElement('p'); x.className = 'muted'; x.textContent = q.expl;
+    d.append(y, a, x); fl.append(d);
+  }
+  $('rename').hidden = true;
+  if (g.ranked) {
+    const pend = store.get('dwec-pend', []);
+    pend.push({ name: g.name, token: TOKEN, mode: g.mode, ok: g.ok, total: g.ids.length, ms: g.ms, runId: g.runId });
+    store.set('dwec-pend', pend);
+    $('r-save').textContent = 'Guardando en el ranking…';
+    flushPending();
+  } else {
+    $('r-save').textContent = 'Repaso de fallos: no cuenta para el ranking.';
+  }
+  renderResume(); showJugar('result');
+}
+
+let flushing = false, retryTimer = null;
+async function flushPending() {
+  if (flushing) return; flushing = true; clearTimeout(retryTimer);
+  let pend = store.get('dwec-pend', []);
+  const keep = [];
+  for (const p of pend) {
+    try {
+      const r = await api('/api/score', p);
+      const mine = lastGame && p.runId === lastGame.runId;
+      if (r.status === 200) { if (mine) $('r-save').textContent = 'Guardado en el ranking como ' + p.name + '.'; }
+      else if (r.status === 409) { keep.push({ ...p, blocked: true }); if (mine) { $('r-save').textContent = r.data.error; $('rename').hidden = false; } }
+      else if (r.status >= 500) { keep.push(p); if (mine) $('r-save').textContent = 'El servidor no responde ahora. Lo reintento solo en unos segundos.'; }
+      else if (mine) $('r-save').textContent = 'No se pudo guardar: ' + (r.data.error || 'datos no válidos');
+    } catch {
+      keep.push(p);
+      if (lastGame && p.runId === lastGame.runId) $('r-save').textContent = 'Sin conexión. Tu puntuación se guardará sola cuando vuelva la red.';
+    }
+  }
+  store.set('dwec-pend', keep);
+  flushing = false;
+  if (keep.some((p) => !p.blocked)) retryTimer = setTimeout(flushPending, 20000);
+  if (tab === 'ranking') loadRanking();
+}
+window.addEventListener('online', flushPending);
+
+$('rename').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const n = cleanName($('rename-input').value); const ne = nameError(n);
+  if (ne) { $('r-save').textContent = ne; return; }
+  store.set('dwec-name', n); $('name').value = n;
+  store.set('dwec-pend', store.get('dwec-pend', []).map((p) => (p.blocked ? { ...p, name: n, blocked: false } : p)));
+  if (lastGame) lastGame.name = n;
+  $('rename').hidden = true; $('r-save').textContent = 'Guardando…'; flushPending();
+});
+
+$('btn-again').addEventListener('click', () => { renderResume(); showJugar('inicio'); });
+$('btn-review').addEventListener('click', () => {
+  const g = lastGame; if (!g || !g.fails.length) return;
+  startGame({ mode: 'repaso', tema: 'repaso', ranked: false, name: g.name, ids: shuffle(g.fails.map((f) => f.id)) });
+});
+$('btn-see-rank').addEventListener('click', () => {
+  if (lastGame && lastGame.ranked) { const [t, l] = lastGame.mode.split('-'); $('rk-tema').value = t; $('rk-long').value = l; }
+  showTab('ranking');
+});
+
+/* ---------- Ranking ---------- */
+for (const t of TEMAS) { const o = document.createElement('option'); o.value = t.v; o.textContent = t.label; $('rk-tema').append(o); }
+$('rk-tema').value = prefs.tema; $('rk-long').value = prefs.long;
+let rankData = null, rankMode = null, rankTimer = null;
+async function loadRanking() {
+  clearTimeout(rankTimer);
+  const mode = $('rk-tema').value + '-' + $('rk-long').value;
+  if (mode !== rankMode) { rankData = null; rankMode = mode; renderRanking(); }
+  $('rk-status').textContent = rankData ? '' : 'Cargando…';
+  try {
+    const r = await api('/api/ranking?mode=' + encodeURIComponent(mode));
+    if (mode !== rankMode) return;
+    if (r.status !== 200) throw new Error();
+    rankData = r.data; $('rk-status').textContent = 'Se actualiza solo cada 30 segundos.';
+  } catch {
+    $('rk-status').textContent = 'No se pudo cargar el ranking. Si el servidor estaba dormido tarda unos 30 s en despertar: lo reintento solo.';
+  }
+  renderRanking();
+  if (tab === 'ranking') rankTimer = setTimeout(loadRanking, 30000);
+}
+function renderRanking() {
+  const by = document.querySelector('input[name=rk-by]:checked').value;
+  $('rk-help').textContent = by === 'nota' ? 'Mejor partida de cada persona: primero la nota y, si empatan, el menor tiempo.' : 'Partida más rápida de cada persona con al menos un 80 % de aciertos.';
+  const body = $('rk-body'); body.innerHTML = '';
+  const rows = rankData ? rankData[by] : [];
+  const me = cleanName($('name').value).toLocaleLowerCase('es');
+  if (rankData && !rows.length) {
+    const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 5; td.className = 'muted';
+    td.textContent = 'Todavía nadie ha jugado este modo. ¡Sé la primera persona del ranking!'; tr.append(td); body.append(tr);
+  }
+  rows.forEach((r, i) => {
+    const tr = document.createElement('tr'); if (r.name.toLocaleLowerCase('es') === me) tr.className = 'me';
+    const cells = [[i + 1, 'pos'], [r.name, 'name'], [r.ok + '/' + r.total], [nota(r.ok, r.total)], [fmt(r.ms)]];
+    for (const [v, c] of cells) { const td = document.createElement('td'); td.textContent = v; if (c) td.className = c; tr.append(td); }
+    body.append(tr);
+  });
+}
+$('rk-tema').addEventListener('change', loadRanking);
+$('rk-long').addEventListener('change', loadRanking);
+document.querySelectorAll('input[name=rk-by]').forEach((i) => i.addEventListener('change', renderRanking));
+
+/* ---------- Ejercicios ---------- */
+function renderEjercicios() {
+  const f = document.querySelector('input[name=ex-f]:checked').value;
+  const list = $('ex-list'); list.innerHTML = '';
+  const items = window.EJERCICIOS.filter((e) => f === 'all' || (f === 'amp' ? e.amp : String(e.ud) === f))
+    .sort((a, b) => (b.amp - a.amp) || (a.ud - b.ud));
+  for (const e of items) {
+    const d = document.createElement('details');
+    const s = document.createElement('summary');
+    const tg = document.createElement('span'); tg.className = 'tag' + (e.amp ? ' amp' : ''); tg.textContent = (e.amp ? 'Ampliación · ' : '') + 'UD' + e.ud;
+    const b = document.createElement('b'); b.textContent = e.titulo;
+    s.append(tg, b); d.append(s);
+    const box = document.createElement('div'); box.className = 'ex';
+    const en = document.createElement('p'); en.textContent = e.enunciado;
+    const h1 = document.createElement('span'); h1.className = 'label'; h1.textContent = 'Paso a paso';
+    const ol = document.createElement('ol'); for (const p of e.pasos) { const li = document.createElement('li'); li.textContent = p; ol.append(li); }
+    const h2 = document.createElement('span'); h2.className = 'label'; h2.textContent = 'Solución';
+    const pre = document.createElement('pre'); pre.className = 'code'; pre.textContent = e.codigo;
+    box.append(en, h1, ol, h2, pre);
+    if (e.trampa) { const t = document.createElement('p'); t.className = 'tip'; t.textContent = e.trampa; box.append(t); }
+    d.append(box); list.append(d);
+  }
+}
+document.querySelectorAll('input[name=ex-f]').forEach((i) => i.addEventListener('change', renderEjercicios));
+renderEjercicios();
+
+/* ---------- Arranque ---------- */
+renderResume();
+flushPending();
+</script>
+</body>
+</html>
