@@ -171,7 +171,11 @@
         <div style="display:grid;gap:6px">
           <label class="label" for="name">Tu nombre en el ranking</label>
           <input type="text" id="name" maxlength="20" autocomplete="nickname" placeholder="Ej. Dani" required>
-          <span class="note">Entre 2 y 20 caracteres. El nombre queda ligado a este dispositivo.</span>
+        </div>
+        <div style="display:grid;gap:6px">
+          <label class="label" for="pin">PIN</label>
+          <input type="password" id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="4 a 8 cifras" required>
+          <span class="note">La primera vez que usas un nombre, el PIN que pongas lo reserva. Con el mismo nombre y PIN juegas desde cualquier dispositivo y nadie más puede usarlo.</span>
         </div>
         <fieldset style="border:0;padding:0;margin:0;display:grid;gap:8px">
           <legend class="label" style="margin-bottom:8px">Tema</legend>
@@ -230,8 +234,9 @@
       </div>
       <p id="r-save" class="note" aria-live="polite"></p>
       <form id="rename" class="row" hidden>
-        <input type="text" id="rename-input" maxlength="20" placeholder="Otro nombre" aria-label="Otro nombre">
-        <button type="submit" class="btn">Guardar con este nombre</button>
+        <input type="text" id="rename-input" maxlength="20" placeholder="Nombre" aria-label="Nombre" style="max-width:200px">
+        <input type="password" id="rename-pin" inputmode="numeric" maxlength="8" placeholder="PIN" aria-label="PIN" style="max-width:120px">
+        <button type="submit" class="btn">Guardar puntuación</button>
       </form>
       <div class="row">
         <button type="button" class="btn primary" id="btn-again">Otra partida</button>
@@ -321,16 +326,6 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento: la partida no sobrevive a una recarga */ } },
   del(k) { try { localStorage.removeItem(k); } catch {} },
 };
-function deviceToken() {
-  let t = store.get('dwec-token', null);
-  if (!t || !/^[a-f0-9]{32,64}$/.test(t)) {
-    const b = new Uint8Array(16); crypto.getRandomValues(b);
-    t = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
-    store.set('dwec-token', t);
-  }
-  return t;
-}
-const TOKEN = deviceToken();
 const runId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
 /* ---------- API ---------- */
@@ -366,6 +361,7 @@ function radioChips(el, name, items, checked) {
 }
 const prefs = store.get('dwec-prefs', { tema: '1', long: '20' });
 $('name').value = store.get('dwec-name', '');
+$('pin').value = store.get('dwec-pin', '');
 radioChips($('temas'), 'tema', TEMAS.map((t) => ({ ...t, count: poolOf(t.v).length })), prefs.tema);
 function renderLongs() {
   const t = document.querySelector('input[name=tema]:checked').value;
@@ -381,6 +377,7 @@ function nameError(n) {
   if (!/^[\p{L}\p{N} _.\-]+$/u.test(n)) return 'Usa solo letras, números, espacios, puntos y guiones.';
   return null;
 }
+const pinError = (p) => (/^\d{4,8}$/.test(p) ? null : 'El PIN debe tener entre 4 y 8 cifras.');
 
 $('setup').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -388,17 +385,20 @@ $('setup').addEventListener('submit', async (e) => {
   const name = cleanName($('name').value);
   const ne = nameError(name);
   if (ne) { err.textContent = ne; err.hidden = false; $('name').focus(); return; }
+  const pin = $('pin').value.trim();
+  const pe = pinError(pin);
+  if (pe) { err.textContent = pe; err.hidden = false; $('pin').focus(); return; }
   const tema = document.querySelector('input[name=tema]:checked').value;
   const long = document.querySelector('input[name=long]:checked').value;
-  store.set('dwec-name', name); store.set('dwec-prefs', { tema, long });
+  store.set('dwec-name', name); store.set('dwec-pin', pin); store.set('dwec-prefs', { tema, long });
   $('btn-start').disabled = true;
   try {
-    const r = await api('/api/claim', { name, token: TOKEN });
-    if (r.status === 409 || r.status === 400) { err.textContent = r.data.error || 'Nombre no válido'; err.hidden = false; return; }
+    const r = await api('/api/claim', { name, pin });
+    if (r.status === 409 || r.status === 400 || r.status === 429) { err.textContent = r.data.error || 'Nombre no válido'; err.hidden = false; return; }
   } catch { /* sin conexión: se juega igual y la puntuación se envía cuando vuelva la red */ }
   finally { $('btn-start').disabled = false; }
   const ids = shuffle(poolOf(tema)).slice(0, long === '20' ? 20 : undefined).map((q) => q.id);
-  startGame({ mode: tema + '-' + long, tema, ranked: true, name, ids });
+  startGame({ mode: tema + '-' + long, tema, ranked: true, name, pin, ids });
 });
 
 /* ---------- Partida ---------- */
@@ -407,8 +407,8 @@ let qStart = 0;        // momento en que se mostró la pregunta actual
 let current = null;    // { q, order } pregunta mostrada
 let tick = null;
 
-function startGame({ mode, tema, ranked, name, ids }) {
-  G = { v: 1, mode, tema, ranked, name, ids, i: 0, ok: 0, ms: 0, fails: [], runId: runId() };
+function startGame({ mode, tema, ranked, name, pin, ids }) {
+  G = { v: 1, mode, tema, ranked, name, pin, ids, i: 0, ok: 0, ms: 0, fails: [], runId: runId() };
   saveGame(); showJugar('quiz'); showQuestion();
 }
 const saveGame = () => store.set('dwec-partida', G);
@@ -525,7 +525,7 @@ function finish() {
   $('rename').hidden = true;
   if (g.ranked) {
     const pend = store.get('dwec-pend', []);
-    pend.push({ name: g.name, token: TOKEN, mode: g.mode, ok: g.ok, total: g.ids.length, ms: g.ms, runId: g.runId });
+    pend.push({ name: g.name, pin: g.pin || store.get('dwec-pin', ''), mode: g.mode, ok: g.ok, total: g.ids.length, ms: g.ms, runId: g.runId });
     store.set('dwec-pend', pend);
     $('r-save').textContent = 'Guardando en el ranking…';
     flushPending();
@@ -545,8 +545,11 @@ async function flushPending() {
       const r = await api('/api/score', p);
       const mine = lastGame && p.runId === lastGame.runId;
       if (r.status === 200) { if (mine) $('r-save').textContent = 'Guardado en el ranking como ' + p.name + '.'; }
-      else if (r.status === 409) { keep.push({ ...p, blocked: true }); if (mine) { $('r-save').textContent = r.data.error; $('rename').hidden = false; } }
-      else if (r.status >= 500) { keep.push(p); if (mine) $('r-save').textContent = 'El servidor no responde ahora. Lo reintento solo en unos segundos.'; }
+      else if (r.status === 409 || (r.status === 400 && /PIN/.test(r.data.error || ''))) {
+        keep.push({ ...p, blocked: true });
+        if (mine) { $('r-save').textContent = r.data.error; $('rename-input').value = p.name; $('rename').hidden = false; }
+      }
+      else if (r.status >= 500 || r.status === 429) { keep.push(p); if (mine) $('r-save').textContent = 'El servidor no responde ahora. Lo reintento solo en unos segundos.'; }
       else if (mine) $('r-save').textContent = 'No se pudo guardar: ' + (r.data.error || 'datos no válidos');
     } catch {
       keep.push(p);
@@ -564,9 +567,11 @@ $('rename').addEventListener('submit', (e) => {
   e.preventDefault();
   const n = cleanName($('rename-input').value); const ne = nameError(n);
   if (ne) { $('r-save').textContent = ne; return; }
-  store.set('dwec-name', n); $('name').value = n;
-  store.set('dwec-pend', store.get('dwec-pend', []).map((p) => (p.blocked ? { ...p, name: n, blocked: false } : p)));
-  if (lastGame) lastGame.name = n;
+  const pin = $('rename-pin').value.trim(); const pe = pinError(pin);
+  if (pe) { $('r-save').textContent = pe; return; }
+  store.set('dwec-name', n); $('name').value = n; store.set('dwec-pin', pin); $('pin').value = pin;
+  store.set('dwec-pend', store.get('dwec-pend', []).map((p) => (p.blocked ? { ...p, name: n, pin, blocked: false } : p)));
+  if (lastGame) { lastGame.name = n; lastGame.pin = pin; }
   $('rename').hidden = true; $('r-save').textContent = 'Guardando…'; flushPending();
 });
 

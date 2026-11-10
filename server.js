@@ -78,16 +78,35 @@ function cleanName(n) {
   return name;
 }
 const keyOf = (name) => name.toLocaleLowerCase('es');
-const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
-const validToken = (t) => typeof t === 'string' && /^[a-f0-9]{32,64}$/.test(t);
+// El PIN se guarda con scrypt (sal = nombre), nunca en claro.
+const hashPin = (key, pin) => crypto.scryptSync(pin, 'dwec:' + key, 32).toString('hex');
+const validPin = (p) => typeof p === 'string' && /^\d{4,8}$/.test(p);
 
-// Reserva el nombre para el token de ese dispositivo. Devuelve null si lo tiene otra persona.
-async function claim(name, token) {
+// Bloqueo por nombre tras muchos PIN fallidos, para que no se pueda adivinar probando.
+// shortcut: en memoria, se reinicia al redesplegar; vale para un ranking de clase.
+const fails = new Map();
+const MAX_FAILS = 10, LOCK_MS = 10 * 60 * 1000;
+function locked(key) {
+  const f = fails.get(key);
+  if (f && Date.now() - f.since > LOCK_MS) { fails.delete(key); return false; }
+  return !!f && f.n >= MAX_FAILS;
+}
+function addFail(key) {
+  const f = fails.get(key) || { n: 0, since: Date.now() };
+  f.n++; fails.set(key, f);
+}
+
+// Nombre + PIN: el primero que usa un nombre lo reserva con su PIN; con el mismo PIN se entra desde cualquier dispositivo.
+// Devuelve la clave del jugador, 'locked' o null si el PIN no coincide.
+async function claim(name, pin) {
   const key = keyOf(name);
-  const th = hashToken(token);
+  if (locked(key)) return 'locked';
+  const ph = hashPin(key, pin);
   let p = await db.player(key);
-  if (!p) { await db.addPlayer(key, name, th); p = await db.player(key); }
-  return p.token_hash === th ? key : null;
+  if (!p) { await db.addPlayer(key, name, ph); p = await db.player(key); }
+  if (p.token_hash === ph) { fails.delete(key); return key; }
+  addFail(key);
+  return null;
 }
 
 function validScore(b) {
@@ -127,9 +146,10 @@ async function api(req, res, url) {
     try { b = await readBody(req); } catch { return send(res, 400, { error: 'Petición no válida' }); }
     const name = cleanName(b.name);
     if (!name) return send(res, 400, { error: 'El nombre debe tener entre 2 y 20 letras, números, espacios, puntos, guiones o guiones bajos' });
-    if (!validToken(b.token)) return send(res, 400, { error: 'Petición no válida' });
-    const key = await claim(name, b.token);
-    if (!key) return send(res, 409, { error: 'Ese nombre ya lo usa otra persona. Elige otro.' });
+    if (!validPin(b.pin)) return send(res, 400, { error: 'El PIN debe tener entre 4 y 8 cifras' });
+    const key = await claim(name, b.pin);
+    if (key === 'locked') return send(res, 429, { error: 'Demasiados PIN incorrectos para ese nombre. Espera 10 minutos.' });
+    if (!key) return send(res, 409, { error: 'Ese nombre ya existe y el PIN no coincide. Si es tuyo, revisa el PIN; si no, elige otro nombre.' });
     if (url.pathname === '/api/claim') return send(res, 200, { name });
     const err = validScore(b);
     if (err) return send(res, 400, { error: err });
