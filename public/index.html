@@ -127,6 +127,8 @@
   .ex ol { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
   .tip { border-left: 4px solid var(--accent); padding: 4px 0 4px 12px; }
   .exlist { display: grid; gap: 10px; }
+  nav small { font: 700 11px/1 var(--f-mono); background: var(--bad); color: #fff; border-radius: 9px; padding: 2px 6px; }
+  nav small:empty { display: none; }
 
   @media (max-width: 520px) {
     body { font-size: 16px; }
@@ -143,6 +145,7 @@
     <div class="brand"><i>JS</i> Test DWEC</div>
     <nav aria-label="Secciones">
       <button type="button" data-tab="jugar" aria-current="page">Jugar</button>
+      <button type="button" data-tab="fallos">Fallos <small id="nav-fallos"></small></button>
       <button type="button" data-tab="ranking">Ranking</button>
       <button type="button" data-tab="ejercicios">Práctica</button>
     </nav>
@@ -250,6 +253,22 @@
     </div>
   </section>
 
+  <!-- ===== Fallos ===== -->
+  <section id="v-fallos" class="view" data-view="fallos" hidden>
+    <div class="card">
+      <span class="label">Se guarda en este dispositivo</span>
+      <h1>Aprende tus fallos</h1>
+      <p class="muted">Aquí se acumulan las preguntas que fallas en cualquier partida. Cuando aciertas una <b>2 veces seguidas</b> se da por aprendida y desaparece; si la vuelves a fallar, vuelve a la lista.</p>
+      <div class="row"><div class="chips" id="fl-temas" role="radiogroup" aria-label="Filtrar por tema"></div></div>
+      <div class="row">
+        <button type="button" class="btn primary" id="btn-fl-play">Practicar fallos</button>
+        <button type="button" class="btn" id="btn-fl-clear">Borrar todo</button>
+      </div>
+      <p class="note" id="fl-status"></p>
+    </div>
+    <div class="card" id="fl-card"><div id="fl-list"></div></div>
+  </section>
+
   <!-- ===== Ranking ===== -->
   <section id="v-ranking" class="view" data-view="ranking" hidden>
     <div class="card">
@@ -342,6 +361,7 @@ function showTab(t) {
   document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false'));
   document.querySelectorAll('.view').forEach((v) => { v.hidden = v.dataset.view !== t || (t === 'jugar' && v.id !== 'v-' + jugarView); });
   if (t === 'ranking') loadRanking();
+  if (t === 'fallos') renderFallos();
   window.scrollTo(0, 0);
 }
 let jugarView = 'inicio';
@@ -470,6 +490,7 @@ function answer(pos) {
   btns.forEach((b, i) => { b.disabled = true; if (order[i] === 0) b.classList.add('right'); });
   if (!ok) btns[pos].classList.add('wrong');
   if (ok) G.ok++; else G.fails.push({ id: q.id, chosen });
+  trackFallo(q.id, ok, chosen);
   G.i++; saveGame();
   const fb = $('q-feedback'); fb.className = 'feedback ' + (ok ? 'ok' : 'bad'); fb.innerHTML = '';
   const s = document.createElement('strong'); s.textContent = ok ? 'Correcto' : 'Incorrecto · la buena es la ' + KEYS[order.indexOf(0)];
@@ -498,6 +519,60 @@ $('btn-quit-yes').addEventListener('click', () => {
   clearInterval(tick); current = null; G = null; renderResume(); showJugar('inicio');
 });
 
+function failItem(q, chosen) {
+  const d = document.createElement('div'); d.className = 'fail';
+  const nl = q.text.indexOf('\n');
+  const t = document.createElement('p'); t.style.fontWeight = '700'; t.textContent = nl < 0 ? q.text : q.text.slice(0, nl);
+  d.append(t);
+  if (nl >= 0) { const c = document.createElement('pre'); c.className = 'code'; c.textContent = q.text.slice(nl + 1); d.append(c); }
+  if (q.options[chosen] != null) { const y = document.createElement('p'); y.className = 'yours'; y.textContent = '✗ Tu respuesta: ' + q.options[chosen]; d.append(y); }
+  const a = document.createElement('p'); a.className = 'ans'; a.textContent = '✓ Correcta: ' + q.options[0];
+  const x = document.createElement('p'); x.className = 'muted'; x.textContent = q.expl;
+  d.append(a, x);
+  return d;
+}
+
+/* ---------- Fallos acumulados (localStorage: { id: { n, racha, chosen } }) ---------- */
+const APRENDIDA = 2; // aciertos seguidos para darla por sabida
+const getFallos = () => { const f = store.get('dwec-fallos', {}); for (const id in f) if (!BANK.has(id)) delete f[id]; return f; };
+function trackFallo(id, ok, chosen) {
+  const f = getFallos();
+  if (!ok) f[id] = { n: ((f[id] || {}).n || 0) + 1, racha: 0, chosen };
+  else if (f[id]) { if (++f[id].racha >= APRENDIDA) delete f[id]; }
+  else return;
+  store.set('dwec-fallos', f); updateFallosBadge(f);
+}
+function updateFallosBadge(f = getFallos()) { const n = Object.keys(f).length; $('nav-fallos').textContent = n || ''; }
+const FL_TEMAS = [{ v: 'all', label: 'Todos' }, ...TEMAS.filter((t) => t.v !== 'all').map((t) => ({ v: t.v, label: 'UD' + t.v }))];
+FL_TEMAS[4].label = 'Examen';
+radioChips($('fl-temas'), 'fl-t', FL_TEMAS, 'all');
+$('fl-temas').addEventListener('change', renderFallos);
+function fallosVisibles() {
+  const f = getFallos(); const t = document.querySelector('input[name=fl-t]:checked').value;
+  // los más fallados primero
+  return Object.entries(f).map(([id, v]) => ({ q: BANK.get(id), ...v })).filter((x) => t === 'all' || x.q.u === t).sort((a, b) => b.n - a.n);
+}
+function renderFallos() {
+  const items = fallosVisibles(); updateFallosBadge();
+  const list = $('fl-list'); list.innerHTML = '';
+  $('fl-card').hidden = !items.length; $('btn-fl-play').disabled = !items.length; $('btn-fl-clear').hidden = !Object.keys(getFallos()).length;
+  $('btn-fl-play').textContent = 'Practicar fallos' + (items.length ? ' (' + items.length + ')' : '');
+  $('fl-status').textContent = items.length ? 'El repaso no cuenta para el ranking.' : '¡No tienes fallos pendientes aquí! Juega una partida y los que falles aparecerán en esta lista.';
+  for (const it of items) {
+    const d = failItem(it.q, it.chosen);
+    const meta = document.createElement('div'); meta.className = 'row';
+    const tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = 'UD' + it.q.u + ' · fallada ' + it.n + (it.n === 1 ? ' vez' : ' veces') + ' · ' + it.racha + '/' + APRENDIDA + ' aciertos seguidos';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.style.padding = '4px 10px'; b.textContent = 'Ya me la sé';
+    b.addEventListener('click', () => { const f = getFallos(); delete f[it.q.id]; store.set('dwec-fallos', f); renderFallos(); });
+    meta.append(tg, b); d.prepend(meta); list.append(d);
+  }
+}
+$('btn-fl-play').addEventListener('click', () => {
+  const items = fallosVisibles(); if (!items.length) return;
+  startGame({ mode: 'repaso', tema: 'repaso', ranked: false, name: store.get('dwec-name', ''), ids: shuffle(items.map((x) => x.q.id)) });
+});
+$('btn-fl-clear').addEventListener('click', () => { if (confirm('¿Borrar todos los fallos guardados?')) { store.del('dwec-fallos'); renderFallos(); } });
+
 /* ---------- Resultado y envío de la puntuación ---------- */
 let lastGame = null;
 function finish() {
@@ -510,18 +585,7 @@ function finish() {
   $('r-ok').textContent = g.ok + '/' + g.ids.length; $('r-nota').textContent = nota(g.ok, g.ids.length); $('r-time').textContent = fmt(g.ms);
   const fl = $('r-fails'); fl.innerHTML = '';
   $('r-fails-card').hidden = !g.fails.length; $('btn-review').hidden = !g.fails.length;
-  for (const f of g.fails) {
-    const q = BANK.get(f.id); if (!q) continue;
-    const d = document.createElement('div'); d.className = 'fail';
-    const nl = q.text.indexOf('\n');
-    const t = document.createElement('p'); t.style.fontWeight = '700'; t.textContent = nl < 0 ? q.text : q.text.slice(0, nl);
-    d.append(t);
-    if (nl >= 0) { const c = document.createElement('pre'); c.className = 'code'; c.textContent = q.text.slice(nl + 1); d.append(c); }
-    const y = document.createElement('p'); y.className = 'yours'; y.textContent = '✗ Tu respuesta: ' + q.options[f.chosen];
-    const a = document.createElement('p'); a.className = 'ans'; a.textContent = '✓ Correcta: ' + q.options[0];
-    const x = document.createElement('p'); x.className = 'muted'; x.textContent = q.expl;
-    d.append(y, a, x); fl.append(d);
-  }
+  for (const f of g.fails) { const q = BANK.get(f.id); if (q) fl.append(failItem(q, f.chosen)); }
   $('rename').hidden = true;
   if (g.ranked) {
     const pend = store.get('dwec-pend', []);
@@ -654,6 +718,7 @@ renderEjercicios();
 
 /* ---------- Arranque ---------- */
 renderResume();
+updateFallosBadge();
 flushPending();
 </script>
 </body>
