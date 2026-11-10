@@ -15,6 +15,11 @@ const MIN_RAPIDO = 0.8; // el ranking por tiempo solo cuenta partidas con al men
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 /* ---------- Almacenamiento ---------- */
+// En Render (RENDER=true) sin base de datos el ranking se perdería en cada reinicio: mejor no arrancar.
+if (process.env.RENDER && !process.env.DATABASE_URL) {
+  console.error('Falta la variable DATABASE_URL: añádela en Render (Environment) con la Internal Database URL de Postgres.');
+  process.exit(1);
+}
 let db;
 if (process.env.DATABASE_URL) {
   const { Pool } = require('pg');
