@@ -12,6 +12,9 @@ const LONGS = ['20', 'all'];
 const MODES = TEMAS.flatMap((t) => LONGS.map((l) => `${t}-${l}`));
 const MIN_RAPIDO = 0.8; // el ranking por tiempo solo cuenta partidas con al menos un 80 % de aciertos
 
+// Versión = huella de los ficheros públicos: cambia en cada despliegue que toca la web
+const VERSION = crypto.createHash('sha1').update(fs.readdirSync(PUB).sort().map((f) => f + fs.readFileSync(path.join(PUB, f))).join('')).digest('hex').slice(0, 12);
+
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 /* ---------- Almacenamiento ---------- */
@@ -141,6 +144,7 @@ function readBody(req) {
 }
 
 async function api(req, res, url) {
+  if (req.method === 'GET' && url.pathname === '/api/version') return send(res, 200, { v: VERSION });
   if (req.method === 'GET' && url.pathname === '/api/ranking') {
     const mode = url.searchParams.get('mode');
     if (!MODES.includes(mode)) return send(res, 400, { error: 'Modo no válido' });

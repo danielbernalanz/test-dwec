@@ -358,6 +358,9 @@ async function api(path, body) {
 let tab = 'jugar';
 function showTab(t) {
   tab = t;
+  store.set('dwec-ui', { tab, view: jugarView }); // para volver al mismo sitio tras una recarga
+  // Hay versión nueva: se aplica solo al cambiar de sección sin partida en curso (todo está guardado)
+  if (updateReady && !G && !(t === 'jugar' && jugarView !== 'inicio')) { location.reload(); return; }
   document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false'));
   document.querySelectorAll('.view').forEach((v) => { v.hidden = v.dataset.view !== t || (t === 'jugar' && v.id !== 'v-' + jugarView); });
   if (t === 'ranking') loadRanking();
@@ -577,8 +580,18 @@ $('btn-fl-clear').addEventListener('click', () => { if (confirm('¿Borrar todos 
 let lastGame = null;
 function finish() {
   clearInterval(tick);
-  lastGame = G; G = null; current = null; store.del('dwec-partida');
-  const g = lastGame;
+  lastGame = G; G = null; current = null; store.del('dwec-partida'); store.set('dwec-ultima', lastGame);
+  renderResult(lastGame);
+  if (lastGame.ranked) {
+    const g = lastGame, pend = store.get('dwec-pend', []);
+    pend.push({ name: g.name, pin: g.pin || store.get('dwec-pin', ''), mode: g.mode, ok: g.ok, total: g.ids.length, ms: g.ms, runId: g.runId });
+    store.set('dwec-pend', pend);
+    $('r-save').textContent = 'Guardando en el ranking…';
+    flushPending();
+  }
+  renderResume(); showJugar('result');
+}
+function renderResult(g) {
   $('r-mode').textContent = temaLabel(g.tema) + (g.ranked ? '' : ' · sin ranking');
   const pct = g.ok / g.ids.length;
   $('r-title').textContent = pct === 1 ? '¡Perfecto!' : pct >= .8 ? '¡Muy bien!' : pct >= .5 ? 'Aprobado' : 'A repasar';
@@ -587,16 +600,7 @@ function finish() {
   $('r-fails-card').hidden = !g.fails.length; $('btn-review').hidden = !g.fails.length;
   for (const f of g.fails) { const q = BANK.get(f.id); if (q) fl.append(failItem(q, f.chosen)); }
   $('rename').hidden = true;
-  if (g.ranked) {
-    const pend = store.get('dwec-pend', []);
-    pend.push({ name: g.name, pin: g.pin || store.get('dwec-pin', ''), mode: g.mode, ok: g.ok, total: g.ids.length, ms: g.ms, runId: g.runId });
-    store.set('dwec-pend', pend);
-    $('r-save').textContent = 'Guardando en el ranking…';
-    flushPending();
-  } else {
-    $('r-save').textContent = 'Repaso de fallos: no cuenta para el ranking.';
-  }
-  renderResume(); showJugar('result');
+  $('r-save').textContent = g.ranked ? '' : 'Repaso de fallos: no cuenta para el ranking.';
 }
 
 let flushing = false, retryTimer = null;
@@ -716,9 +720,37 @@ function renderEjercicios() {
 document.querySelectorAll('input[name=ex-f]').forEach((i) => i.addEventListener('change', renderEjercicios));
 renderEjercicios();
 
-/* ---------- Arranque ---------- */
+/* ---------- Actualizaciones sin interrumpir ---------- */
+// Si se cierra o recarga la pestaña a mitad de pregunta, el tiempo ya pensado se guarda.
+window.addEventListener('pagehide', () => {
+  if (G && current && !current.answered) { G.ms = Math.round(G.ms + Math.min(performance.now() - qStart, 600000)); qStart = performance.now(); saveGame(); }
+});
+// Se comprueba de vez en cuando si hay versión nueva; no se recarga nunca en mitad de una partida.
+let version = null, updateReady = false;
+async function checkVersion() {
+  if (updateReady) return;
+  try {
+    const r = await api('/api/version');
+    if (r.status !== 200 || !r.data.v) return;
+    if (version && r.data.v !== version) updateReady = true; else version = r.data.v;
+  } catch { /* servidor reiniciándose: se vuelve a mirar luego */ }
+}
+checkVersion(); setInterval(checkVersion, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });
+
+/* ---------- Arranque: se vuelve a donde estabas ---------- */
 renderResume();
 updateFallosBadge();
+{
+  const ui = store.get('dwec-ui', {}), g = resumable(), last = store.get('dwec-ultima', null);
+  if (ui.tab === 'jugar' && ui.view === 'quiz' && g) { G = g; showJugar('quiz'); showQuestion(); }
+  else if (ui.tab === 'jugar' && ui.view === 'result' && last && Array.isArray(last.ids)) {
+    lastGame = last; last.fails = (last.fails || []).filter((f) => BANK.has(f.id));
+    renderResult(last); showJugar('result');
+    if (last.ranked && !store.get('dwec-pend', []).some((p) => p.runId === last.runId)) $('r-save').textContent = 'Guardado en el ranking como ' + last.name + '.';
+  }
+  else if (['ranking', 'fallos', 'ejercicios'].includes(ui.tab)) showTab(ui.tab);
+}
 flushPending();
 </script>
 </body>
